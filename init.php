@@ -1,6 +1,7 @@
 <?php
 class af_refspoof extends Plugin
 {
+    private const STORAGE_ENABLED_FEEDS = 'enabled_feeds';
 
     private $host;
     private $dbh;
@@ -89,7 +90,7 @@ EOF;
     public function hook_render_article_cdm($article)
     {
         $feedId = $article['feed_id'];
-        $feeds  = $this->host->get($this, 'feeds');
+        $feeds  = $this->host->get($this, STORAGE_ENABLED_FEEDS);
 
         if (is_array($feeds) && in_array($feedId,array_keys($feeds))){
             $doc = new DOMDocument();
@@ -135,7 +136,7 @@ EOF;
     function saveConfig()
     {
         $config = (array) $_POST['refSpoofFeed'];
-        $this->host->set($this, 'feeds', $config);
+        $this->host->set($this, STORAGE_ENABLED_FEEDS, $config);
         echo __("Configuration saved.");
     }
     protected function translate($msg){
