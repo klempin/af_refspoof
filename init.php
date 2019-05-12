@@ -1,7 +1,7 @@
 <?php
 class af_refspoof extends Plugin
 {
-    private const STORAGE_ENABLED_FEEDS = 'enabled_feeds';
+    private const STORAGE_ENABLED_FEEDS = 'feeds';
 
     private $host;
     private $dbh;
