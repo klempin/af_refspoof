@@ -1,38 +1,29 @@
 <?php
-class af_refspoof extends Plugin {
-    /** @var PluginHost **/
-    protected $host;
+class af_refspoof extends Plugin
+{
 
-    /** @var Db **/
-    protected $dbh;
+    private $host;
+    private $dbh;
 
-    function about() {
+    public function about()
+    {
         return array(
             "1.0.4",
             "Fakes Referral on Images",
             "Alexander Chernov"
             );
     }
-    /**
-    * Init
-    *
-    * @param PluginHost $host
-    */
-    function init($host) {
-        require_once ("PhCURL.php");
 
+    public function init($host)
+    {
+        require_once("PhCURL.php");
         $this->host = $host;
         $this->dbh = Db::get();
-        $host->add_hook($host::HOOK_RENDER_ARTICLE_CDM, $this);
         $host->add_hook($host::HOOK_PREFS_TAB, $this);
+        $host->add_hook($host::HOOK_RENDER_ARTICLE_CDM, $this);
     }
 
-    /**
-    * Preference tab hook
-    *
-    * @param mixed $args
-    */
-    function hook_prefs_tab($args)
+    public function hook_prefs_tab($args)
     {
         if ($args != "" && $args != "prefPrefs"){
             return;
@@ -95,7 +86,7 @@ EOF;
         print "</div>";
     }
 
-    function hook_render_article_cdm($article)
+    public function hook_render_article_cdm($article)
     {
         $feedId = $article['feed_id'];
         $feeds  = $this->host->get($this, 'feeds');
@@ -126,6 +117,7 @@ EOF;
         }
         return $article;
     }
+
     function redirect()
     {
         $client = new PhCURL($_REQUEST["url"]);
