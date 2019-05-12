@@ -20,8 +20,30 @@ class af_refspoof extends Plugin
         require_once("PhCURL.php");
         $this->host = $host;
         $this->dbh = Db::get();
+        $host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
         $host->add_hook($host::HOOK_PREFS_TAB, $this);
+        $host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
         $host->add_hook($host::HOOK_RENDER_ARTICLE_CDM, $this);
+    }
+
+    public function hook_prefs_edit_feed($feedId)
+    {
+        $enabledFeeds = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
+        $checked = array_key_exists($feedId, $enabledFeeds) ? "checked" : "no";
+        $title = __("Fake referral");
+        $label = __('Fake referral for this feed');
+        echo <<<EOF
+<header>{$title}</header>
+<section>
+    <fieldset>
+        <input dojoType="dijit.form.CheckBox" type="checkbox" id="af_refspoof_enabled"
+            name="af_refspoof_enabled" {$checked}>
+        <label class="checkbox" for="af_refspoof_enabled">
+            {$label}
+        </label>
+    </fieldset>
+</section>
+EOF;
     }
 
     public function hook_prefs_tab($args)
@@ -85,6 +107,21 @@ EOF;
             print "</form>";
         }
         print "</div>";
+    }
+
+    public function hook_prefs_save_feed($feedId)
+    {
+        $enabledFeeds = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
+        
+        if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"])) {
+            $enabledFeeds[$feedId] = 1;
+        } else {
+            if (array_key_exists($feedId, $enabledFeeds)) {
+                unset($enabledFeeds[$feedId]);
+            }
+        }
+
+        $this->host->set($this, STORAGE_ENABLED_FEEDS, $enabledFeeds);
     }
 
     public function hook_render_article_cdm($article)
