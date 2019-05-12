@@ -48,65 +48,68 @@ EOF;
 
     public function hook_prefs_tab($args)
     {
-        if ($args != "" && $args != "prefPrefs"){
+        if ($args !== "prefFeeds") {
             return;
         }
-        $configFeeds = $this->host->get($this,"feeds");
+
+        $configFeeds = $this->host->get($this, STORAGE_ENABLED_FEEDS);
         $feeds = $this->getFeeds();
+        
+        if (!count($feeds)) {
+            return;
+        }
 
-        print <<<EOF
-        <div id="refSpoofConfigTab" dojoType="dijit.layout.ContentPane" title="{$this->translate('Plugin RefSpoof')}" style="overflow:auto">
-EOF;
-        if (count($feeds)){
-            //table header
-            print <<<EOF
-            <form dojoType="dijit.form.Form" style="width:95%">
-            <input dojoType="dijit.form.TextBox" style="display : none" name="op" value="pluginhandler">
-            <input dojoType="dijit.form.TextBox" style="display : none" name="method" value="saveConfig">
-            <input dojoType="dijit.form.TextBox" style="display : none" name="plugin" value="af_refspoof">
-
-            <script type="dojo/method" event="onSubmit" args="evt">
-                evt.preventDefault();
-                if (this.validate()) {
-                    new Ajax.Request('backend.php', {
-                        parameters: dojo.objectToQuery(this.getValues()),
-                        onComplete: function(transport) {
-                            if (transport.responseText.indexOf('error')>=0)
-                                notify_error(transport.responseText);
-                            else notify_info(transport.responseText);
-                        }
-                    });
+        $title = __("Fake referral");
+        $name = __("Feed name");
+        $save = __("Save");
+        echo <<<EOT
+<div dojoType="dijit.layout.AccordionPane" title="<i class='material-icons'>image</i> {$title}">
+<form dojoType="dijit.form.Form" style="width:95%">
+    <input type="hidden" dojoType="dijit.form.TextBox" name="op" value="pluginhandler">
+    <input type="hidden" dojoType="dijit.form.TextBox" name="method" value="saveConfig">
+    <input type="hidden" dojoType="dijit.form.TextBox" name="plugin" value="af_refspoof">
+    <script type="dojo/method" event="onSubmit" args="evt">
+        evt.preventDefault();
+        if (this.validate()) {
+            new Ajax.Request('backend.php', {
+                parameters: dojo.objectToQuery(this.getValues()),
+                onComplete: function(transport) {
+                    if (transport.responseText.indexOf('error')>=0) {
+                        notify_error(transport.responseText);
+                    } else {
+                        notify_info(transport.responseText);
+                    }
                 }
-                </script>
-            <table>
-                <tr>
-                    <th>{$this->translate("Feed Name")}</th>
-                    <th></th>
-                </tr>
-EOF;
-            foreach ($feeds as $feed){
-                $checked = "";
-                if (isset($configFeeds[$feed->id])){
-                    $checked = "checked='checked'";
-                }
-                print <<<EOF
-                <tr>
-                    <td colspan="2">
-                        <input dojoType="dijit.form.CheckBox" type="checkbox" name="refSpoofFeed[{$feed->id}]" id="refSpoofFeed_{$feed->id}" value="1" {$checked}>{$feed->title}
-                    </td>
-                </tr>
-EOF;
+            });
+        }
+    </script>
+    <table>
+        <tr>
+            <th>{$name}</th>
+        </tr>
+EOT;
+        foreach ($feeds as $feed) {
+            $checked = "";
+            if (isset($configFeeds[$feed->id])) {
+                $checked = "checked='checked'";
             }
             print <<<EOF
-            <tr>
-                <td></td>
-                <td><button dojoType="dijit.form.Button" type="submit">{$this->translate("Save")}</button></td>
-            </tr>
+        <tr>
+            <td colspan="2">
+                <input dojoType="dijit.form.CheckBox" type="checkbox" name="refSpoofFeed[{$feed->id}]" id="refSpoofFeed_{$feed->id}" value="1" {$checked}>{$feed->title}
+            </td>
+        </tr>
 EOF;
-            print "</table>";
-            print "</form>";
         }
-        print "</div>";
+        echo <<<EOT
+        <tr>
+            <td></td>
+            <td><button dojoType="dijit.form.Button" type="submit">{$save}</button></td>
+        </tr>
+    </table>
+</form>
+</div>
+EOT;
     }
 
     public function hook_prefs_save_feed($feedId)
