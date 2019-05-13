@@ -114,28 +114,27 @@ EOT;
     public function hook_render_article_cdm($article)
     {
         $feedId = $article['feed_id'];
-        $feeds  = $this->host->get($this, STORAGE_ENABLED_FEEDS);
+        $enabledFeeds  = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
+        
 
-        if (is_array($feeds) && in_array($feedId,array_keys($feeds))){
+        if (array_key_exists($feedId, $enabledFeeds) || $this->isDomainEnabled($article["link"])) {
             $doc = new DOMDocument();
             @$doc->loadHTML($article['content']);
-            if ($doc) {
+            if ($doc !== false) {
                 $xpath = new DOMXPath($doc);
-                $entries = $xpath->query('(//img[@src])');
-                /** @var $entry DOMElement **/
+                $entries = $xpath->query("(//img[@src])");
                 $entry = null;
-                $backendURL = 'backend.php?op=pluginhandler&method=redirect&plugin=af_refspoof';
-                foreach ($entries as $entry){
+                $backendURL = 'backend.php?op=pluginhandler&method=proxy&plugin=af_refspoof';
+                foreach ($entries as $entry) {
                     $origSrc = $entry->getAttribute("src");
                     if ($origSrcSet = $entry->getAttribute("srcset")) {
                         $srcSet = preg_replace_callback('#([^\s]+://[^\s]+)#', function ($m) use ($backendURL, $article) {
                             return $backendURL . '&url=' . urlencode($m[0]) . '&ref=' . urlencode($article['link']);
                         }, $origSrcSet);
-
                         $entry->setAttribute("srcset", $srcSet);
                     }
                     $url = $backendURL . '&url=' . urlencode($origSrc) . '&ref=' . urlencode($article['link']);
-                    $entry->setAttribute("src",$url);
+                    $entry->setAttribute("src", $url);
                 }
                 $article["content"] = $doc->saveXML();
             }
@@ -159,7 +158,7 @@ EOT;
         echo __("Domains saved");
     }
 
-    function redirect()
+    public function proxy()
     {
         $client = new PhCURL($_REQUEST["url"]);
         $client->loadCommonSettings();
