@@ -2,6 +2,7 @@
 class af_refspoof extends Plugin
 {
     private const STORAGE_ENABLED_FEEDS = 'feeds';
+    private const STORAGE_ENABLED_DOMAINS = "enabled_domains";
 
     private $host;
     private $dbh;
@@ -29,7 +30,7 @@ class af_refspoof extends Plugin
     public function hook_prefs_edit_feed($feedId)
     {
         $enabledFeeds = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
-        $checked = array_key_exists($feedId, $enabledFeeds) ? "checked" : "no";
+        $checked = array_key_exists($feedId, $enabledFeeds) ? "checked" : "";
         $title = __("Fake referral");
         $label = __('Fake referral for this feed');
         echo <<<EOF
@@ -60,54 +61,37 @@ EOF;
         }
 
         $title = __("Fake referral");
-        $name = __("Feed name");
-        $save = __("Save");
+        $header = __("Enable referral spoofing based on the feed domain");
+        $enabledDomains = implode("\n", $this->host->get($this, STORAGE_ENABLED_DOMAINS, ""));
+        $button = __("Save");
         echo <<<EOT
-<div dojoType="dijit.layout.AccordionPane" title="<i class='material-icons'>image</i> {$title}">
-<form dojoType="dijit.form.Form" style="width:95%">
-    <input type="hidden" dojoType="dijit.form.TextBox" name="op" value="pluginhandler">
-    <input type="hidden" dojoType="dijit.form.TextBox" name="method" value="saveConfig">
-    <input type="hidden" dojoType="dijit.form.TextBox" name="plugin" value="af_refspoof">
-    <script type="dojo/method" event="onSubmit" args="evt">
-        evt.preventDefault();
-        if (this.validate()) {
-            new Ajax.Request('backend.php', {
-                parameters: dojo.objectToQuery(this.getValues()),
-                onComplete: function(transport) {
-                    if (transport.responseText.indexOf('error')>=0) {
-                        notify_error(transport.responseText);
-                    } else {
-                        notify_info(transport.responseText);
+<div data-dojo-type="dijit/layout/ContentPane" title="<i class='material-icons'>image</i> {$title}"
+    style="display:flex;flex-direction:column;">
+    <h3>{$header}</h3>
+    
+    <form data-dojo-type="dijit/form/Form" style="flex-grow:1;display:flex;flex-direction:column;">
+        <input type="hidden" data-dojo-type="dijit/form/TextBox" name="op" value="pluginhandler">
+        <input type="hidden" data-dojo-type="dijit/form/TextBox" name="plugin" value="af_refspoof">
+        <input type="hidden" data-dojo-type="dijit/form/TextBox" name="method" value="saveDomains">
+        <script type="dojo/method" event="onSubmit" args="evt">
+            evt.preventDefault();
+            if (this.validate()) {
+                new Ajax.Request('backend.php', {
+                    parameters: dojo.objectToQuery(this.getValues()),
+                    onLoading: function() {
+                        Notify.progress("Saving...");
+                    },
+                    onComplete: function(transport) {
+                        Notify.info(transport.responseText);
                     }
-                }
-            });
-        }
-    </script>
-    <table>
-        <tr>
-            <th>{$name}</th>
-        </tr>
-EOT;
-        foreach ($feeds as $feed) {
-            $checked = "";
-            if (isset($configFeeds[$feed->id])) {
-                $checked = "checked='checked'";
+                });
             }
-            print <<<EOF
-        <tr>
-            <td colspan="2">
-                <input dojoType="dijit.form.CheckBox" type="checkbox" name="refSpoofFeed[{$feed->id}]" id="refSpoofFeed_{$feed->id}" value="1" {$checked}>{$feed->title}
-            </td>
-        </tr>
-EOF;
-        }
-        echo <<<EOT
-        <tr>
-            <td></td>
-            <td><button dojoType="dijit.form.Button" type="submit">{$save}</button></td>
-        </tr>
-    </table>
-</form>
+        </script>
+
+        <textarea id="af_domains" name="af_domains" data-dojo-type="dijit/form/SimpleTextarea"
+            style="box-sizing:border-box;width:50%;height:100%;">{$enabledDomains}</textarea>
+        <button data-dojo-type="dijit/form/Button" type="submit">{$button}</button>
+    </form>
 </div>
 EOT;
     }
@@ -157,6 +141,22 @@ EOT;
             }
         }
         return $article;
+    }
+
+    public function saveDomains()
+    {
+        if (!isset($_POST["af_domains"])) {
+            echo __("No domains saved");
+            return;
+        }
+        $domains = explode("\n", str_replace("\r", "", $_POST["af_domains"]));
+        foreach ($domains as $key => $value) {
+            if (strlen($value) < 1) {
+                unset($domains[$key]);
+            }
+        }
+        $this->host->set($this, STORAGE_ENABLED_DOMAINS, $domains);
+        echo __("Domains saved");
     }
 
     function redirect()
