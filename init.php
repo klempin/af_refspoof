@@ -9,7 +9,7 @@ class af_refspoof extends Plugin
     public function about()
     {
         return array(
-            "1.0.4",
+            1.1,
             "Fakes Referral on Images",
             "Alexander Chernov"
             );
@@ -52,7 +52,7 @@ EOF;
         }
 
         $title = __("Fake referral");
-        $header = __("Enable referral spoofing based on the feed domain");
+        $header = __("Enable referral spoofing based on the feed domain (enter one domain per line)");
         $enabledDomains = implode("\n", $this->host->get($this, STORAGE_ENABLED_DOMAINS, ""));
         $button = __("Save");
 

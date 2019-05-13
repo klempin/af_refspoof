@@ -1,11 +1,12 @@
-af_refspoof
-===========
+# af_refspoof
+af_refspoof is a plugin for [Tiny Tiny RSS](https://tt-rss.org/). It proxies images through Tiny Tiny RSS and adds a fake referral header.
 
-This plugin allow to fake referral on feed images. A lot of sites protect their images from hotlinking, but unfortunately it also breaks rss readers functionality (especialy the web ones). 
+A lot of sites protect their images from hotlinking, but unfortunately it also breaks rss readers functionality (especialy the web ones).
 
-This plugin rewrite image path and pass it through proxy with fake referral (article link).
+## Installation
 
-Installation
-===========
+Download the current release and place the folder named af_refspoof insed the Tiny Tiny RSS plugins.local directory. In the backend, look for the plugin "af_refspoof" and enable it.
 
-Download and place login in folder named af_refspoof under Tiny Tiny Rss plugin directory. Go to backend and enable it, after that you will see a new panel under Preferences tab called "Plugin RefSpoof". Click on it, enable feeds which require faking of referral and you are done. 
+You can enable af_refspoof for single feeds by going to the Edit Feed dialogue box and checking the box "Fake referral for this feed" in the Plugins tab.
+
+You can also enable the plugin for entire domains by going into preferences and opening the Fake referral panel in the Feeds tab.
