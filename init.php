@@ -107,9 +107,8 @@ EOT;
     {
         $feedId = $article['feed_id'];
         $enabledFeeds  = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
-        
 
-        if (array_key_exists($feedId, $enabledFeeds) || $this->isDomainEnabled($article["link"])) {
+        if (array_key_exists($feedId, $enabledFeeds) || $this->isDomainEnabled($article["site_url"])) {
             $doc = new DOMDocument();
             @$doc->loadHTML($article['content']);
             if ($doc !== false) {
