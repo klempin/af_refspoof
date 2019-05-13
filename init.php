@@ -5,7 +5,6 @@ class af_refspoof extends Plugin
     private const STORAGE_ENABLED_DOMAINS = "enabled_domains";
 
     private $host;
-    private $dbh;
 
     public function about()
     {
@@ -18,13 +17,11 @@ class af_refspoof extends Plugin
 
     public function init($host)
     {
-        require_once("PhCURL.php");
         $this->host = $host;
-        $this->dbh = Db::get();
-        $host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
-        $host->add_hook($host::HOOK_PREFS_TAB, $this);
-        $host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
-        $host->add_hook($host::HOOK_RENDER_ARTICLE_CDM, $this);
+        $this->host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
+        $this->host->add_hook($host::HOOK_PREFS_TAB, $this);
+        $this->host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
+        $this->host->add_hook($host::HOOK_RENDER_ARTICLE_CDM, $this);
     }
 
     public function hook_prefs_edit_feed($feedId)
@@ -33,6 +30,7 @@ class af_refspoof extends Plugin
         $checked = array_key_exists($feedId, $enabledFeeds) ? "checked" : "";
         $title = __("Fake referral");
         $label = __('Fake referral for this feed');
+
         echo <<<EOF
 <header>{$title}</header>
 <section>
@@ -53,17 +51,11 @@ EOF;
             return;
         }
 
-        $configFeeds = $this->host->get($this, STORAGE_ENABLED_FEEDS);
-        $feeds = $this->getFeeds();
-        
-        if (!count($feeds)) {
-            return;
-        }
-
         $title = __("Fake referral");
         $header = __("Enable referral spoofing based on the feed domain");
         $enabledDomains = implode("\n", $this->host->get($this, STORAGE_ENABLED_DOMAINS, ""));
         $button = __("Save");
+
         echo <<<EOT
 <div data-dojo-type="dijit/layout/ContentPane" title="<i class='material-icons'>image</i> {$title}"
     style="display:flex;flex-direction:column;">
@@ -160,45 +152,16 @@ EOT;
 
     public function proxy()
     {
-        $client = new PhCURL($_REQUEST["url"]);
-        $client->loadCommonSettings();
-        $client->setReferer($_REQUEST["ref"]);
-        $client->setUserAgent();
-
-        $client->GET();
-        ob_end_clean();
-        //header_remove("Content-Type: text/json; charset=utf-8");
-        header("Content-Type: ". $client->getContentType());
-        echo $client->getData();
-        exit(1);
-    }
-
-    function saveConfig()
-    {
-        $config = (array) $_POST['refSpoofFeed'];
-        $this->host->set($this, STORAGE_ENABLED_FEEDS, $config);
-        echo __("Configuration saved.");
-    }
-    protected function translate($msg)
-    {
-        return __($msg);
-    }
-    /**
-    * Find feeds from db
-    *
-    * @return array feeds
-    */
-    protected function getFeeds()
-    {
-        $feeds = array();
-        $result = $this->dbh->query("SELECT id, title
-                FROM ttrss_feeds
-                WHERE owner_uid = ".$_SESSION["uid"].
-                " ORDER BY order_id, title");
-        while ($line = $this->dbh->fetch_assoc($result)) {
-            $feeds[] = (object) $line;
-        }
-        return $feeds;
+        $userAgent = "Mozilla/5.0 (Windows NT 6.0; WOW64; rv:66.0) Gecko/20100101 Firefox/66.0";
+        $curl = curl_init($_REQUEST["url"]);
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
+        curl_setopt($curl, CURLOPT_REFERER, $_REQUEST["ref"]);
+        curl_setopt($curl, CURLOPT_USERAGENT, $userAgent);
+        $data = curl_exec($curl);
+        header("Content-Type: ". curl_getinfo($curl, CURLINFO_CONTENT_TYPE));
+        echo $data;
     }
 
     public function api_version()
