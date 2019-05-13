@@ -173,13 +173,15 @@ EOT;
         echo $client->getData();
         exit(1);
     }
+
     function saveConfig()
     {
         $config = (array) $_POST['refSpoofFeed'];
         $this->host->set($this, STORAGE_ENABLED_FEEDS, $config);
         echo __("Configuration saved.");
     }
-    protected function translate($msg){
+    protected function translate($msg)
+    {
         return __($msg);
     }
     /**
@@ -199,8 +201,20 @@ EOT;
         }
         return $feeds;
     }
-    function api_version() {
+
+    public function api_version()
+    {
         return 2;
     }
 
+    private function isDomainEnabled($feedUri)
+    {
+        $enabledDomains = $this->host->get($this, STORAGE_ENABLED_DOMAINS, array());
+        $host = parse_url($feedUri, PHP_URL_HOST);
+
+        if (strpos($host, "www.") === 0 && in_array(str_replace("www.", "", $host), $enabledDomains)) {
+            return true;
+        }
+        return in_array($host, $enabledDomains);
+    }
 }
