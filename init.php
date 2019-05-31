@@ -151,12 +151,20 @@ EOT;
 
     public function proxy()
     {
+        $requestUri = "";
+        if (strpos($_REQUEST["url"], "/") === 0) {
+            $requestUri .= parse_url($_REQUEST["ref"], PHP_URL_SCHEME) . ":";
+            if (strpos($_REQUEST["url"], "//") !== 0) {
+                $requestUri .= "/";
+            }
+        }
+        $requestUri .= $_REQUEST["url"];
         $userAgent = "Mozilla/5.0 (Windows NT 6.0; WOW64; rv:66.0) Gecko/20100101 Firefox/66.0";
         $curl = curl_init($_REQUEST["url"]);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
-        curl_setopt($curl, CURLOPT_REFERER, $_REQUEST["ref"]);
+        curl_setopt($curl, CURLOPT_REFERER, $requestUri);
         curl_setopt($curl, CURLOPT_USERAGENT, $userAgent);
         $data = curl_exec($curl);
         header("Content-Type: ". curl_getinfo($curl, CURLINFO_CONTENT_TYPE));
