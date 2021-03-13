@@ -154,6 +154,7 @@ EOT;
             }
         }
         $requestUri .= $_REQUEST["url"];
+        $filename=basename($requestUri);
         $userAgent = "Mozilla/5.0 (Windows NT 6.0; WOW64; rv:66.0) Gecko/20100101 Firefox/66.0";
         $curl = curl_init($requestUri);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
@@ -163,6 +164,7 @@ EOT;
         curl_setopt($curl, CURLOPT_USERAGENT, $userAgent);
         $data = curl_exec($curl);
         header("Content-Type: ". curl_getinfo($curl, CURLINFO_CONTENT_TYPE));
+        header("Content-Disposition:  filename=" . $filename);
         echo $data;
     }
 
