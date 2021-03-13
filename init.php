@@ -1,8 +1,8 @@
 <?php
 class af_refspoof extends Plugin
 {
-    const STORAGE_ENABLED_FEEDS = 'feeds';
-    const STORAGE_ENABLED_DOMAINS = "enabled_domains";
+    private const STORAGE_ENABLED_FEEDS = 'feeds';
+    private const STORAGE_ENABLED_DOMAINS = "enabled_domains";
 
     private $host;
 
