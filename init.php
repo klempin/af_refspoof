@@ -14,7 +14,7 @@ class af_refspoof extends Plugin
             "Alexander Chernov",
             false,
             "https://github.com/klempin/af_refspoof"
-            );
+        );
     }
 
     public function csrf_ignore($method)
@@ -26,12 +26,17 @@ class af_refspoof extends Plugin
         return false;
     }
 
+    public function api_version()
+    {
+        return 2;
+    }
+
     public function init($host)
     {
         $this->host = $host;
         $this->host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
-        $this->host->add_hook($host::HOOK_PREFS_TAB, $this);
         $this->host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
+        $this->host->add_hook($host::HOOK_PREFS_TAB, $this);
         $this->host->add_hook($host::HOOK_RENDER_ARTICLE_CDM, $this);
     }
 
@@ -54,6 +59,21 @@ class af_refspoof extends Plugin
     </fieldset>
 </section>
 EOF;
+    }
+
+    public function hook_prefs_save_feed($feedId)
+    {
+        $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
+
+        if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"] ?? false)) {
+            $enabledFeeds[$feedId] = 1;
+        } else {
+            if (array_key_exists($feedId, $enabledFeeds)) {
+                unset($enabledFeeds[$feedId]);
+            }
+        }
+
+        $this->host->set($this, static::STORAGE_ENABLED_FEEDS, $enabledFeeds);
     }
 
     public function hook_prefs_tab($args)
@@ -96,21 +116,6 @@ EOF;
 EOT;
     }
 
-    public function hook_prefs_save_feed($feedId)
-    {
-        $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
-
-        if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"] ?? false)) {
-            $enabledFeeds[$feedId] = 1;
-        } else {
-            if (array_key_exists($feedId, $enabledFeeds)) {
-                unset($enabledFeeds[$feedId]);
-            }
-        }
-
-        $this->host->set($this, static::STORAGE_ENABLED_FEEDS, $enabledFeeds);
-    }
-
     public function hook_render_article_cdm($article)
     {
         $feedId = $article['feed_id'];
@@ -141,22 +146,6 @@ EOT;
         return $article;
     }
 
-    public function save_domains()
-    {
-        if (!isset($_POST["af_domains"])) {
-            echo __("No domains saved");
-            return;
-        }
-        $domains = explode("\n", str_replace("\r", "", $_POST["af_domains"]));
-        foreach ($domains as $key => $value) {
-            if (strlen($value) < 1) {
-                unset($domains[$key]);
-            }
-        }
-        $this->host->set($this, static::STORAGE_ENABLED_DOMAINS, $domains);
-        echo __("Domains saved");
-    }
-
     public function proxy()
     {
         $requestUri = "";
@@ -179,9 +168,20 @@ EOT;
         echo $data;
     }
 
-    public function api_version()
+    public function save_domains()
     {
-        return 2;
+        if (!isset($_POST["af_domains"])) {
+            echo __("No domains saved");
+            return;
+        }
+        $domains = explode("\n", str_replace("\r", "", $_POST["af_domains"]));
+        foreach ($domains as $key => $value) {
+            if (strlen($value) < 1) {
+                unset($domains[$key]);
+            }
+        }
+        $this->host->set($this, static::STORAGE_ENABLED_DOMAINS, $domains);
+        echo __("Domains saved");
     }
 
     private function isDomainEnabled($feedUri)
