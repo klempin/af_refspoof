@@ -61,37 +61,34 @@ EOF;
         }
 
         $title = __("Fake referral");
-        $header = __("Enable referral spoofing based on the feed domain (enter one domain per line)");
-        $button = __("Save");
+        $heading = __("Enable referral spoofing based on the feed domain (enter one domain per line)");
         $enabledDomains = implode("\n", $this->host->get($this, static::STORAGE_ENABLED_DOMAINS, array()));
+        $pluginHandlerTags = \Controls\pluginhandler_tags($this, "save_domains");
+        $submitTag = \Controls\submit_tag(__("Save"));
 
         echo <<<EOT
-<div data-dojo-type="dijit/layout/ContentPane" title="<i class='material-icons'>image</i> {$title}"
-    style="display:flex;flex-direction:column;">
-    <h3>{$header}</h3>
-    
-    <form data-dojo-type="dijit/form/Form" style="flex-grow:1;display:flex;flex-direction:column;">
-        <input type="hidden" data-dojo-type="dijit/form/TextBox" name="op" value="pluginhandler">
-        <input type="hidden" data-dojo-type="dijit/form/TextBox" name="plugin" value="af_refspoof">
-        <input type="hidden" data-dojo-type="dijit/form/TextBox" name="method" value="saveDomains">
+<div dojoType="dijit.layout.AccordionPane" title="<i class='material-icons'>image</i> {$title}">
+    <h3>{$heading}</h3>
+
+    <form dojoType='dijit.form.Form'>
+        {$pluginHandlerTags}
         <script type="dojo/method" event="onSubmit" args="evt">
             evt.preventDefault();
             if (this.validate()) {
-                new Ajax.Request('backend.php', {
-                    parameters: dojo.objectToQuery(this.getValues()),
-                    onLoading: function() {
-                        Notify.progress("Saving...");
-                    },
-                    onComplete: function(transport) {
-                        Notify.info(transport.responseText);
-                    }
-                });
+                Notify.progress('Saving data...', true);
+                xhr.post("backend.php", this.getValues(), (reply) => {
+                    Notify.info(reply);
+                })
             }
         </script>
 
-        <textarea id="af_domains" name="af_domains" data-dojo-type="dijit/form/SimpleTextarea"
-            style="box-sizing:border-box;width:50%;height:100%;">{$enabledDomains}</textarea>
-        <button data-dojo-type="dijit/form/Button" type="submit">{$button}</button>
+        <fieldset>
+            <textarea id="af_domains" name="af_domains" data-dojo-type="dijit/form/SimpleTextarea" style="height:400px;box-sizing:border-box;">{$enabledDomains}</textarea>
+        </fieldset>
+
+        <fieldset>
+            {$submitTag}
+        </fieldset>
     </form>
 </div>
 EOT;
@@ -142,7 +139,7 @@ EOT;
         return $article;
     }
 
-    public function saveDomains()
+    public function save_domains()
     {
         if (!isset($_POST["af_domains"])) {
             echo __("No domains saved");
