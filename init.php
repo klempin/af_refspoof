@@ -15,6 +15,15 @@ class af_refspoof extends Plugin
             );
     }
 
+    public function csrf_ignore($method)
+    {
+        if ($method === "proxy") {
+            return true;
+        }
+
+        return false;
+    }
+
     public function init($host)
     {
         $this->host = $host;
