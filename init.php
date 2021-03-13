@@ -20,7 +20,7 @@ class af_refspoof extends Plugin
     {
         $this->host = $host;
         $this->host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
-        //$this->host->add_hook($host::HOOK_PREFS_TAB, $this);
+        $this->host->add_hook($host::HOOK_PREFS_TAB, $this);
         $this->host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
         $this->host->add_hook($host::HOOK_RENDER_ARTICLE_CDM, $this);
     }
@@ -48,42 +48,36 @@ EOF;
 
     public function hook_prefs_tab($args)
     {
-        if ($args !== "prefFeeds") {
-            return;
-        }
+        if ($args != "prefFeeds") return;
 
         $title = __("Fake referral");
         $header = __("Enable referral spoofing based on the feed domain (enter one domain per line)");
         $enabledDomains = implode("\n", $this->host->get($this, "STORAGE_ENABLED_DOMAINS", ""));
         $button = __("Save");
-
-                echo <<<EOT
-<div data-dojo-type="dijit/layout/ContentPane" title="<i class='material-icons'>image</i> {$title}"
+        $value = $this->host->get($this, "af_refspoof");
+        echo <<<EOT
+<div dojoType="dijit.layout.AccordionPane" title="<i class='material-icons'>image</i> {$title}"
     style="display:flex;flex-direction:column;">
     <h3>{$header}</h3>
 
-    <form data-dojo-type="dijit/form/Form" style="flex-grow:1;display:flex;flex-direction:column;">
-        <input type="hidden" data-dojo-type="dijit/form/TextBox" name="op" value="pluginhandler">
-        <input type="hidden" data-dojo-type="dijit/form/TextBox" name="plugin" value="af_refspoof">
-        <input type="hidden" data-dojo-type="dijit/form/TextBox" name="method" value="saveDomains">
+    <form dojoType="dijit.form.Form" style="flex-grow:1;display:flex;flex-direction:column;">
+        <input type="hidden" dojoType="dijit.form.TextBox" name="op" value="pluginhandler">
+        <input type="hidden" dojoType="dijit.form.TextBox" name="plugin" value="af_refspoof">
+        <input type="hidden" dojoType="dijit.form.TextBox" name="method" value="saveDomains">
         <script type="dojo/method" event="onSubmit" args="evt">
             evt.preventDefault();
+            console.log(dojo.objectToQuery(this.getValues()));
             if (this.validate()) {
-                new Ajax.Request('backend.php', {
-                    parameters: dojo.objectToQuery(this.getValues()),
-                    onLoading: function() {
-                        Notify.progress("Saving...");
-                    },
-                    onComplete: function(transport) {
-                        Notify.info(transport.responseText);
-                    }
-                });
+                Notify.progress('Saving data...', true);
+                xhr.post("backend.php", this.getValues(), (reply) => {
+                    Notify.info(reply);
+                })
             }
         </script>
 
-        <textarea id="af_domains" name="af_domains" data-dojo-type="dijit/form/SimpleTextarea"
+        <textarea id="af_domains" name="af_domains" dojoType="dijit.form.SimpleTextarea"
             style="box-sizing:border-box;width:50%;height:100%;">{$enabledDomains}</textarea>
-        <button data-dojo-type="dijit/form/Button" type="submit">{$button}</button>
+        <button dojoType="dijit.form.Button" type="submit">{$button}</button>
     </form>
 </div>
 EOT;
