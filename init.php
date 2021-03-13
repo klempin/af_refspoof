@@ -9,9 +9,11 @@ class af_refspoof extends Plugin
     public function about()
     {
         return array(
-            1.1,
-            "Fakes Referral on Images",
-            "Alexander Chernov"
+            null,
+            "Fakes referral header on images",
+            "Alexander Chernov",
+            false,
+            "https://github.com/klempin/af_refspoof"
             );
     }
 
