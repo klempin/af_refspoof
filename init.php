@@ -99,7 +99,6 @@ EOT;
 
     public function hook_prefs_save_feed($feedId)
     {
-        if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"])) {
         $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
 
         if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"] ?? false)) {
