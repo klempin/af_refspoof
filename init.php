@@ -1,7 +1,8 @@
 <?php
+# https://github.com/klempin/af_refspoof
 class af_refspoof extends Plugin
 {
-    const STORAGE_ENABLED_FEEDS = 'feeds';
+    const STORAGE_ENABLED_FEEDS = "feeds";
     const STORAGE_ENABLED_DOMAINS = "enabled_domains";
 
     private $host;
@@ -9,7 +10,7 @@ class af_refspoof extends Plugin
     public function about()
     {
         return array(
-            1.1,
+            1.20210313,
             "Fakes Referral on Images",
             "Alexander Chernov"
             );
@@ -19,14 +20,14 @@ class af_refspoof extends Plugin
     {
         $this->host = $host;
         $this->host->add_hook($host::HOOK_PREFS_EDIT_FEED, $this);
-        $this->host->add_hook($host::HOOK_PREFS_TAB, $this);
+        //$this->host->add_hook($host::HOOK_PREFS_TAB, $this);
         $this->host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
         $this->host->add_hook($host::HOOK_RENDER_ARTICLE_CDM, $this);
     }
 
     public function hook_prefs_edit_feed($feedId)
     {
-        $enabledFeeds = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
+        $enabledFeeds = $this->host->get($this, "STORAGE_ENABLED_FEEDS", array());
         $checked = array_key_exists($feedId, $enabledFeeds) ? "checked" : "";
         $title = __("Fake referral");
         $label = __('Fake referral for this feed');
@@ -53,14 +54,14 @@ EOF;
 
         $title = __("Fake referral");
         $header = __("Enable referral spoofing based on the feed domain (enter one domain per line)");
-        $enabledDomains = implode("\n", $this->host->get($this, STORAGE_ENABLED_DOMAINS, ""));
+        $enabledDomains = implode("\n", $this->host->get($this, "STORAGE_ENABLED_DOMAINS", ""));
         $button = __("Save");
 
-        echo <<<EOT
+                echo <<<EOT
 <div data-dojo-type="dijit/layout/ContentPane" title="<i class='material-icons'>image</i> {$title}"
     style="display:flex;flex-direction:column;">
     <h3>{$header}</h3>
-    
+
     <form data-dojo-type="dijit/form/Form" style="flex-grow:1;display:flex;flex-direction:column;">
         <input type="hidden" data-dojo-type="dijit/form/TextBox" name="op" value="pluginhandler">
         <input type="hidden" data-dojo-type="dijit/form/TextBox" name="plugin" value="af_refspoof">
@@ -90,8 +91,8 @@ EOT;
 
     public function hook_prefs_save_feed($feedId)
     {
-        $enabledFeeds = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
-        
+        $enabledFeeds = $this->host->get($this, "STORAGE_ENABLED_FEEDS", array());
+
         if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"])) {
             $enabledFeeds[$feedId] = 1;
         } else {
@@ -100,13 +101,13 @@ EOT;
             }
         }
 
-        $this->host->set($this, STORAGE_ENABLED_FEEDS, $enabledFeeds);
+        $this->host->set($this, "STORAGE_ENABLED_FEEDS", $enabledFeeds);
     }
 
     public function hook_render_article_cdm($article)
     {
         $feedId = $article['feed_id'];
-        $enabledFeeds  = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
+        $enabledFeeds  = $this->host->get($this, "STORAGE_ENABLED_FEEDS", array());
 
         if (array_key_exists($feedId, $enabledFeeds) || $this->isDomainEnabled($article["site_url"])) {
             $doc = new DOMDocument();
@@ -145,7 +146,7 @@ EOT;
                 unset($domains[$key]);
             }
         }
-        $this->host->set($this, STORAGE_ENABLED_DOMAINS, $domains);
+        $this->host->set($this, "STORAGE_ENABLED_DOMAINS", $domains);
         echo __("Domains saved");
     }
 
@@ -178,7 +179,7 @@ EOT;
 
     private function isDomainEnabled($feedUri)
     {
-        $enabledDomains = $this->host->get($this, STORAGE_ENABLED_DOMAINS, array());
+        $enabledDomains = $this->host->get($this, "STORAGE_ENABLED_DOMAINS", array());
         $host = parse_url($feedUri, PHP_URL_HOST);
 
         if (strpos($host, "www.") === 0 && in_array(str_replace("www.", "", $host), $enabledDomains)) {
@@ -186,4 +187,9 @@ EOT;
         }
         return in_array($host, $enabledDomains);
     }
+
+    public function csrf_ignore($method) {
+        return true;
+    }
+
 }
