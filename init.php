@@ -43,7 +43,7 @@ class af_refspoof extends Plugin
     public function hook_prefs_edit_feed($feedId)
     {
         $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
-        $checked = array_key_exists($feedId, $enabledFeeds) ? "checked" : "";
+        $checked = array_key_exists($feedId, $enabledFeeds) ? " checked" : "";
         $title = __("Fake referral");
         $label = __('Fake referral for this feed');
 
@@ -51,8 +51,7 @@ class af_refspoof extends Plugin
 <header>{$title}</header>
 <section>
     <fieldset>
-        <input dojoType="dijit.form.CheckBox" type="checkbox" id="af_refspoof_enabled"
-            name="af_refspoof_enabled" {$checked}>
+        <input dojoType="dijit.form.CheckBox" type="checkbox" id="af_refspoof_enabled" name="af_refspoof_enabled"{$checked}>
         <label class="checkbox" for="af_refspoof_enabled">
             {$label}
         </label>
@@ -66,11 +65,9 @@ EOF;
         $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
 
         if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"] ?? false)) {
-            $enabledFeeds[$feedId] = 1;
+            $enabledFeeds[$feedId] = $feedId;
         } else {
-            if (array_key_exists($feedId, $enabledFeeds)) {
-                unset($enabledFeeds[$feedId]);
-            }
+            unset($enabledFeeds[$feedId]);
         }
 
         $this->host->set($this, static::STORAGE_ENABLED_FEEDS, $enabledFeeds);
@@ -118,17 +115,16 @@ EOT;
 
     public function hook_render_article_cdm($article)
     {
-        $feedId = $article['feed_id'];
         $enabledFeeds  = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
 
-        if (array_key_exists($feedId, $enabledFeeds) || $this->isDomainEnabled($article["site_url"])) {
+        if (array_key_exists($article['feed_id'], $enabledFeeds) || $this->isDomainEnabled($article["site_url"])) {
             $doc = new DOMDocument();
             @$doc->loadHTML($article['content']);
             if ($doc !== false) {
                 $xpath = new DOMXPath($doc);
                 $entries = $xpath->query("(//img[@src])");
-                $entry = null;
-                $backendURL = 'backend.php?op=pluginhandler&method=proxy&plugin=af_refspoof';
+                $backendURL = Config::get_self_url() . '/backend.php?op=pluginhandler&method=proxy&plugin=af_refspoof';
+
                 foreach ($entries as $entry) {
                     $origSrc = $entry->getAttribute("src");
                     if ($origSrcSet = $entry->getAttribute("srcset")) {
