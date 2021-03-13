@@ -53,8 +53,8 @@ EOF;
 
         $title = __("Fake referral");
         $header = __("Enable referral spoofing based on the feed domain (enter one domain per line)");
-        $enabledDomains = implode("\n", $this->host->get($this, STORAGE_ENABLED_DOMAINS, ""));
         $button = __("Save");
+        $enabledDomains = implode("\n", $this->host->get($this, STORAGE_ENABLED_DOMAINS, array()));
 
         echo <<<EOT
 <div data-dojo-type="dijit/layout/ContentPane" title="<i class='material-icons'>image</i> {$title}"
