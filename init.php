@@ -26,7 +26,7 @@ class af_refspoof extends Plugin
 
     public function hook_prefs_edit_feed($feedId)
     {
-        $enabledFeeds = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
+        $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
         $checked = array_key_exists($feedId, $enabledFeeds) ? "checked" : "";
         $title = __("Fake referral");
         $label = __('Fake referral for this feed');
@@ -90,9 +90,9 @@ EOT;
 
     public function hook_prefs_save_feed($feedId)
     {
-        $enabledFeeds = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
-        
         if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"])) {
+        $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
+
             $enabledFeeds[$feedId] = 1;
         } else {
             if (array_key_exists($feedId, $enabledFeeds)) {
@@ -100,13 +100,13 @@ EOT;
             }
         }
 
-        $this->host->set($this, STORAGE_ENABLED_FEEDS, $enabledFeeds);
+        $this->host->set($this, static::STORAGE_ENABLED_FEEDS, $enabledFeeds);
     }
 
     public function hook_render_article_cdm($article)
     {
         $feedId = $article['feed_id'];
-        $enabledFeeds  = $this->host->get($this, STORAGE_ENABLED_FEEDS, array());
+        $enabledFeeds  = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
 
         if (array_key_exists($feedId, $enabledFeeds) || $this->isDomainEnabled($article["site_url"])) {
             $doc = new DOMDocument();
@@ -145,7 +145,7 @@ EOT;
                 unset($domains[$key]);
             }
         }
-        $this->host->set($this, STORAGE_ENABLED_DOMAINS, $domains);
+        $this->host->set($this, static::STORAGE_ENABLED_DOMAINS, $domains);
         echo __("Domains saved");
     }
 
@@ -178,7 +178,7 @@ EOT;
 
     private function isDomainEnabled($feedUri)
     {
-        $enabledDomains = $this->host->get($this, STORAGE_ENABLED_DOMAINS, array());
+        $enabledDomains = $this->host->get($this, static::STORAGE_ENABLED_DOMAINS, array());
         $host = parse_url($feedUri, PHP_URL_HOST);
 
         if (strpos($host, "www.") === 0 && in_array(str_replace("www.", "", $host), $enabledDomains)) {
