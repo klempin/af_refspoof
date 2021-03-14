@@ -1,8 +1,9 @@
 <?php
 class af_refspoof extends Plugin
 {
-    private const STORAGE_ENABLED_FEEDS = 'feeds';
-    private const STORAGE_ENABLED_DOMAINS = "enabled_domains";
+    private const LEGACY_ENABLED_FEEDS = 'feeds'; // 2021-03-14
+    private const ENABLED_FEEDS = "enabled_feeds";
+    private const ENABLED_DOMAINS = "enabled_domains";
 
     private $host;
 
@@ -38,6 +39,20 @@ class af_refspoof extends Plugin
         $this->host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
         $this->host->add_hook($host::HOOK_PREFS_TAB, $this);
         $this->host->add_hook($host::HOOK_RENDER_ARTICLE_CDM, $this);
+
+        $legacyEnabledFeeds = $this->host->get($this, static::LEGACY_ENABLED_FEEDS, false);
+        if (is_array($legacyEnabledFeeds)) {
+            $enabledFeeds = $this->host->get($this, static::ENABLED_FEEDS, array());
+
+            foreach ($legacyEnabledFeeds as $key => $value) {
+                if (!array_key_exists($key, $enabledFeeds)) {
+                    $enabledFeeds[$key] = $value;
+                }
+            }
+
+            $this->host->set($this, static::LEGACY_ENABLED_FEEDS, null);
+            $this->host->set($this, static::ENABLED_FEEDS, $enabledFeeds);
+        }
     }
 
     public function hook_prefs_edit_feed($feedId)
@@ -47,7 +62,7 @@ class af_refspoof extends Plugin
                 ->where("owner_uid", $_SESSION["uid"])
                 ->find_one();
 
-        $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
+        $enabledFeeds = $this->host->get($this, static::ENABLED_FEEDS, array());
 
         $message = "";
         if ($this->isDomainEnabled($feed["site_url"])) {
@@ -78,7 +93,7 @@ EOF;
 
     public function hook_prefs_save_feed($feedId)
     {
-        $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
+        $enabledFeeds = $this->host->get($this, static::ENABLED_FEEDS, array());
 
         if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"] ?? false)) {
             $enabledFeeds[$feedId] = $feedId;
@@ -86,7 +101,7 @@ EOF;
             unset($enabledFeeds[$feedId]);
         }
 
-        $this->host->set($this, static::STORAGE_ENABLED_FEEDS, $enabledFeeds);
+        $this->host->set($this, static::ENABLED_FEEDS, $enabledFeeds);
     }
 
     public function hook_prefs_tab($args)
@@ -97,7 +112,7 @@ EOF;
 
         $title = __("Fake referral");
         $heading = __("Enable referral spoofing based on the feed domain (enter one domain per line)");
-        $enabledDomains = implode("\n", $this->host->get($this, static::STORAGE_ENABLED_DOMAINS, array()));
+        $enabledDomains = implode("\n", $this->host->get($this, static::ENABLED_DOMAINS, array()));
         $pluginHandlerTags = \Controls\pluginhandler_tags($this, "save_domains");
         $submitTag = \Controls\submit_tag(__("Save"));
 
@@ -131,7 +146,7 @@ EOT;
 
     public function hook_render_article_cdm($article)
     {
-        $enabledFeeds  = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
+        $enabledFeeds  = $this->host->get($this, static::ENABLED_FEEDS, array());
 
         if (array_key_exists($article['feed_id'], $enabledFeeds) || $this->isDomainEnabled($article["site_url"])) {
             $doc = new DOMDocument();
@@ -218,13 +233,13 @@ EOT;
                 unset($domains[$key]);
             }
         }
-        $this->host->set($this, static::STORAGE_ENABLED_DOMAINS, $domains);
+        $this->host->set($this, static::ENABLED_DOMAINS, $domains);
         echo __("Domains saved");
     }
 
     private function isDomainEnabled($feedUri)
     {
-        $enabledDomains = $this->host->get($this, static::STORAGE_ENABLED_DOMAINS, array());
+        $enabledDomains = $this->host->get($this, static::ENABLED_DOMAINS, array());
         $host = parse_url($feedUri, PHP_URL_HOST);
 
         if (strpos($host, "www.") === 0 && in_array(str_replace("www.", "", $host), $enabledDomains)) {
