@@ -250,14 +250,30 @@ EOT;
             echo "Request url:                  " . $_REQUEST["url"] . "\n";
             echo "Request url after processing: " . $requestUri . "\n";
             echo "Referrer url:                 " . $_REQUEST["ref"] . "\n";
-            echo "Filename:                     " . basename($url["path"]) . "\n\n";
+            echo "Base name:                    " . basename($url["path"]) . "\n\n";
             echo "CURL information:\n";
             print_r($curlInfo);
             echo "\nCURL data:\n";
             echo $curlData;
         } else if (($curlInfo["http_code"] ?? false) === 200) {
             if (($url["path"] ?? null) !== null) {
-                header('Content-Disposition: inline; filename="' . basename($url["path"]) . '"');
+                $fileName = basename($url["path"]);
+                if (strlen(pathinfo($fileName, PATHINFO_EXTENSION)) === 0) {
+                    $contentTypes = [
+                        "image/bmp" => ".bmp",
+                        "image/gif" => ".gif",
+                        "image/vnd.microsoft.icon" => ".ico",
+                        "image/jpeg" => ".jpg",
+                        "image/png" => ".png",
+                        "image/svg+xml" => ".svg",
+                        "image/tiff" => ".tif",
+                        "image/webp" => ".webp"
+                    ];
+
+                    $fileName .= $contentTypes[$curlInfo["content_type"]] ?? "";
+                }
+
+                header('Content-Disposition: inline; filename="' . $fileName . '"');
             }
             header("Content-Type: " . $curlInfo["content_type"]);
             echo $curlData;
