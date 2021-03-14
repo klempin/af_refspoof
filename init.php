@@ -43,7 +43,7 @@ class af_refspoof extends Plugin
     public function hook_prefs_edit_feed($feedId)
     {
         $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
-        $checked = array_key_exists($feedId, $enabledFeeds) ? "checked" : "";
+        $checked = array_key_exists($feedId, $enabledFeeds) ? " checked" : "";
         $title = __("Fake referral");
         $label = __('Fake referral for this feed');
 
@@ -51,8 +51,7 @@ class af_refspoof extends Plugin
 <header>{$title}</header>
 <section>
     <fieldset>
-        <input dojoType="dijit.form.CheckBox" type="checkbox" id="af_refspoof_enabled"
-            name="af_refspoof_enabled" {$checked}>
+        <input dojoType="dijit.form.CheckBox" type="checkbox" id="af_refspoof_enabled" name="af_refspoof_enabled"{$checked}>
         <label class="checkbox" for="af_refspoof_enabled">
             {$label}
         </label>
@@ -66,11 +65,9 @@ EOF;
         $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
 
         if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"] ?? false)) {
-            $enabledFeeds[$feedId] = 1;
+            $enabledFeeds[$feedId] = $feedId;
         } else {
-            if (array_key_exists($feedId, $enabledFeeds)) {
-                unset($enabledFeeds[$feedId]);
-            }
+            unset($enabledFeeds[$feedId]);
         }
 
         $this->host->set($this, static::STORAGE_ENABLED_FEEDS, $enabledFeeds);
@@ -118,17 +115,16 @@ EOT;
 
     public function hook_render_article_cdm($article)
     {
-        $feedId = $article['feed_id'];
         $enabledFeeds  = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
 
-        if (array_key_exists($feedId, $enabledFeeds) || $this->isDomainEnabled($article["site_url"])) {
+        if (array_key_exists($article['feed_id'], $enabledFeeds) || $this->isDomainEnabled($article["site_url"])) {
             $doc = new DOMDocument();
             @$doc->loadHTML($article['content']);
             if ($doc !== false) {
                 $xpath = new DOMXPath($doc);
                 $entries = $xpath->query("(//img[@src])");
-                $entry = null;
-                $backendURL = 'backend.php?op=pluginhandler&method=proxy&plugin=af_refspoof';
+                $backendURL = Config::get_self_url() . '/backend.php?op=pluginhandler&method=proxy&plugin=af_refspoof';
+
                 foreach ($entries as $entry) {
                     $origSrc = $entry->getAttribute("src");
                     if ($origSrcSet = $entry->getAttribute("srcset")) {
@@ -148,26 +144,51 @@ EOT;
 
     public function proxy()
     {
+        $url = parse_url($_REQUEST["url"]);
+        $ref = parse_url($_REQUEST["ref"]);
         $requestUri = "";
+
         if (strpos($_REQUEST["url"], "/") === 0) {
-            $requestUri .= parse_url($_REQUEST["ref"], PHP_URL_SCHEME) . ":";
+            $requestUri .= ($ref["scheme"] ?? "http") . ":";
+
             if (strpos($_REQUEST["url"], "//") !== 0) {
                 $requestUri .= "/";
             }
         }
+
         $requestUri .= $_REQUEST["url"];
         $filename = basename($requestUri);
         $userAgent = "Mozilla/5.0 (Windows NT 6.0; WOW64; rv:66.0) Gecko/20100101 Firefox/66.0";
+
         $curl = curl_init($requestUri);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
         curl_setopt($curl, CURLOPT_REFERER, $_REQUEST["ref"]);
         curl_setopt($curl, CURLOPT_USERAGENT, $userAgent);
-        $data = curl_exec($curl);
-        header("Content-Type: ". curl_getinfo($curl, CURLINFO_CONTENT_TYPE));
-        header("Content-Disposition:  filename=" . $filename);
-        echo $data;
+        $curlData = curl_exec($curl);
+        $curlInfo = curl_getinfo($curl);
+        curl_close($curl);
+
+        if ($_REQUEST["origin_info"] ?? false) {
+            header("Content-Type: text/plain");
+            echo "Request url:                  " . $_REQUEST["url"] . "\n";
+            echo "Request url after processing: " . $requestUri . "\n";
+            echo "Referrer url:                 " . $_REQUEST["ref"] . "\n\n";
+            echo "CURL information:\n";
+            print_r($curlInfo);
+            echo "\nCURL data:\n";
+            echo $curlData;
+
+        } else if ($curlInfo["http_code"] ?? false === 200) {
+            if ($url["path"] ?? null !== null) {
+                header('Content-Disposition: inline; filename="' . basename($url["path"]) . '"');
+            }
+            header("Content-Type: " . $curlInfo["content_type"]);
+            echo $curlData;
+
+        } {
+            http_response_code($curlInfo["http_code"]);
+        }
     }
 
     public function save_domains()
