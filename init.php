@@ -1,4 +1,5 @@
 <?php
+
 class af_refspoof extends Plugin
 {
     private const LEGACY_ENABLED_FEEDS = 'feeds'; // 2021-03-14
@@ -59,28 +60,30 @@ class af_refspoof extends Plugin
     public function hook_prefs_edit_feed($feedId)
     {
         $feed = ORM::for_table("ttrss_feeds")
-                ->where("id", $feedId)
-                ->where("owner_uid", $_SESSION["uid"])
-                ->find_one();
+            ->where("id", $feedId)
+            ->where("owner_uid", $_SESSION["uid"])
+            ->find_one();
+        $result = $this->feedEnabled($feedId, $feed["site_url"], true);
 
-        $enabledFeeds = $this->host->get($this, static::ENABLED_FEEDS, array());
-
-        $message = "";
-        if ($this->host->get($this, static::ENABLED_GLOBALLY, false)) {
-            $checked = " checked disabled";
-            $message = "<p>" . __("Fake referral is enabled globally.") . "</p>";
-        } elseif ($this->isDomainEnabled($feed["site_url"])) {
+        if ($result["enabled"] === false) {
+            $checked = "";
+            $message = "";
+        } elseif ($result["reason"] === static::ENABLED_FEEDS) {
+            $checked = " checked";
+            $message = "";
+        } elseif ($result["reason"] === static::ENABLED_DOMAINS) {
             $checked = " checked disabled";
             $message = "<p>" . __("This feed is enabled based on the domain list") . "</p>";
-        } elseif (array_key_exists($feedId, $enabledFeeds)) {
-            $checked = " checked";
+        } elseif ($result["reason"] === static::ENABLED_GLOBALLY) {
+            $checked = " checked disabled";
+            $message = "<p>" . __("Fake referral is enabled globally.") . "</p>";
         } else {
-            $checked = "";
+            $checked = " checked";
+            $message = "";
         }
 
         $title = __("Fake referral");
         $label = __('Fake referral for this feed');
-
         echo <<<EOF
 <header>{$title}</header>
 {$message}
@@ -116,6 +119,7 @@ EOF;
 
         $title = __("Fake referral");
         $heading = __("Enable referral spoofing based on the feed domain (enter one domain per line)");
+        $enabledFeedsHeading = __("Fake referral is enabled for these feeds");
         $enabledDomains = htmlspecialchars(implode("\n", $this->host->get($this, static::ENABLED_DOMAINS, array())));
         $enabledGloballyCheckbox = \Controls\checkbox_tag(
             "af_refspoof_enabled_globally",
@@ -127,6 +131,23 @@ EOF;
         $enabledGlobally = __("Enabled globally");
         $pluginHandlerTags = \Controls\pluginhandler_tags($this, "save_settings");
         $submitTag = \Controls\submit_tag(__("Save"));
+        $feeds = ORM::for_table("ttrss_feeds")
+            ->where("owner_uid", $_SESSION["uid"])
+            ->find_many();
+        $enabledFeeds = "";
+        foreach ($feeds as $feed) {
+            $result = $this->feedEnabled($feed["id"], $feed["site_url"], true);
+            if ($result["enabled"] !== true) {
+                continue;
+            }
+            $enabledFeeds .= <<<EOT
+<tr>
+    <td><i class="material-icons">rss_feed</i></td>
+    <td><a href="#"	onclick="CommonDialogs.editFeed({$feed["id"]})">{$feed["title"]}</a></td>
+    <td>{$result["comment"]}</td>
+</tr>
+EOT;
+        }
 
         echo <<<EOT
 <div dojoType="dijit.layout.AccordionPane" title="<i class='material-icons'>image</i> {$title}">
@@ -148,8 +169,6 @@ EOF;
             <textarea name="af_refspoof_domains" data-dojo-type="dijit/form/SimpleTextarea" style="height:400px;box-sizing:border-box;">{$enabledDomains}</textarea>
         </fieldset>
 
-        <hr>
-
         <fieldset>
             <label for="af_refspoof_enabled_globally" class="checkbox">{$enabledGloballyCheckbox} {$enabledGlobally}</label>
         </fieldset>
@@ -160,17 +179,22 @@ EOF;
             {$submitTag}
         </fieldset>
     </form>
+
+    <hr>
+
+    <h3>{$enabledFeedsHeading}</h3>
+    <div class="panel panel-scrollable">
+        <table>
+            {$enabledFeeds}
+        </table>
+    </div>
 </div>
 EOT;
     }
 
     public function hook_render_article_cdm($article)
     {
-        if (
-            $this->host->get($this, static::ENABLED_GLOBALLY)
-            || array_key_exists($article['feed_id'], $this->host->get($this, static::ENABLED_FEEDS, array()))
-            || $this->isDomainEnabled($article["site_url"])
-        ) {
+        if ($this->feedEnabled($article["feed_id"], $article["site_url"]) === true) {
             $doc = new DOMDocument();
             if (!empty($article["content"]) && $doc->loadHTML($article["content"])) {
                 $xpath = new DOMXPath($doc);
@@ -191,6 +215,7 @@ EOT;
                 $article["content"] = $doc->saveXML();
             }
         }
+
         return $article;
     }
 
@@ -224,19 +249,18 @@ EOT;
             header("Content-Type: text/plain");
             echo "Request url:                  " . $_REQUEST["url"] . "\n";
             echo "Request url after processing: " . $requestUri . "\n";
-            echo "Referrer url:                 " . $_REQUEST["ref"] . "\n\n";
+            echo "Referrer url:                 " . $_REQUEST["ref"] . "\n";
+            echo "Filename:                     " . basename($url["path"]) . "\n\n";
             echo "CURL information:\n";
             print_r($curlInfo);
             echo "\nCURL data:\n";
             echo $curlData;
-
         } else if (($curlInfo["http_code"] ?? false) === 200) {
             if (($url["path"] ?? null) !== null) {
                 header('Content-Disposition: inline; filename="' . basename($url["path"]) . '"');
             }
             header("Content-Type: " . $curlInfo["content_type"]);
             echo $curlData;
-
         } {
             http_response_code($curlInfo["http_code"]);
         }
@@ -261,14 +285,56 @@ EOT;
         echo __("af_refspoof: Settings saved");
     }
 
-    private function isDomainEnabled($feedUri)
+    private function feedEnabled(int $feedId, string $siteUrl = null, bool $extendedInfo = false)
     {
-        $enabledDomains = $this->host->get($this, static::ENABLED_DOMAINS, array());
-        $host = parse_url($feedUri, PHP_URL_HOST);
-
-        if (strpos($host, "www.") === 0 && in_array(str_replace("www.", "", $host), $enabledDomains)) {
-            return true;
+        if ($this->host->get($this, static::ENABLED_GLOBALLY, false)) {
+            return $extendedInfo === false ? true : [
+                "enabled" => true,
+                "reason" => static::ENABLED_GLOBALLY,
+                "comment" => "Enabled globally"
+            ];
         }
-        return in_array($host, $enabledDomains);
+
+        if ($siteUrl !== null) {
+            $enabledDomains = $this->host->get($this, static::ENABLED_DOMAINS, array());
+            $siteHost = parse_url($siteUrl, PHP_URL_HOST);
+
+            if ($siteHost !== false) {
+                foreach ($enabledDomains as $enabledDomain) {
+                    if (PHP_MAJOR_VERSION >= 8) {
+                        if (str_ends_with(mb_strtolower($siteHost), mb_strtolower($enabledDomain))) {
+                            return $extendedInfo === false ? true : [
+                                "enabled" => true,
+                                "reason" => static::ENABLED_DOMAINS,
+                                "comment" => "Enabled domain: " . $enabledDomain
+                            ];
+                        }
+                    } else {
+                        if (mb_strtolower($siteHost) === mb_strtolower($enabledDomain)) {
+                            return $extendedInfo === false ? true : [
+                                "enabled" => true,
+                                "reason" => static::ENABLED_DOMAINS,
+                                "comment" => "Enabled domain: " . $enabledDomain
+                            ];
+                        }
+                    }
+                }
+            }
+        }
+
+        $enabledFeeds = $this->host->get($this, static::ENABLED_FEEDS, []);
+        if (array_key_exists($feedId, $enabledFeeds)) {
+            return $extendedInfo === false ? true : [
+                "enabled" => true,
+                "reason" => static::ENABLED_FEEDS,
+                "comment" => "Enabled feed"
+            ];
+        }
+
+        return $extendedInfo === false ? false : [
+            "enabled" => false,
+            "reason" => "No match",
+            "comment" => "Disabled"
+        ];
     }
 }
