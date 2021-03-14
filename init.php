@@ -4,6 +4,7 @@ class af_refspoof extends Plugin
     private const LEGACY_ENABLED_FEEDS = 'feeds'; // 2021-03-14
     private const ENABLED_FEEDS = "enabled_feeds";
     private const ENABLED_DOMAINS = "enabled_domains";
+    private const ENABLED_GLOBALLY = "enabled_globally";
 
     private $host;
 
@@ -65,7 +66,10 @@ class af_refspoof extends Plugin
         $enabledFeeds = $this->host->get($this, static::ENABLED_FEEDS, array());
 
         $message = "";
-        if ($this->isDomainEnabled($feed["site_url"])) {
+        if ($this->host->get($this, static::ENABLED_GLOBALLY, false)) {
+            $checked = " checked disabled";
+            $message = "<p>" . __("Fake referral is enabled globally.") . "</p>";
+        } elseif ($this->isDomainEnabled($feed["site_url"])) {
             $checked = " checked disabled";
             $message = "<p>" . __("This feed is enabled based on the domain list") . "</p>";
         } elseif (array_key_exists($feedId, $enabledFeeds)) {
@@ -112,7 +116,15 @@ EOF;
 
         $title = __("Fake referral");
         $heading = __("Enable referral spoofing based on the feed domain (enter one domain per line)");
-        $enabledDomains = implode("\n", $this->host->get($this, static::ENABLED_DOMAINS, array()));
+        $enabledDomains = htmlspecialchars(implode("\n", $this->host->get($this, static::ENABLED_DOMAINS, array())));
+        $enabledGloballyCheckbox = \Controls\checkbox_tag(
+            "af_refspoof_enabled_globally",
+            $this->host->get($this, static::ENABLED_GLOBALLY, false) === true ? true : false,
+            "on",
+            array(),
+            "af_refspoof_enabled_globally"
+        );
+        $enabledGlobally = __("Enabled globally");
         $pluginHandlerTags = \Controls\pluginhandler_tags($this, "save_domains");
         $submitTag = \Controls\submit_tag(__("Save"));
 
@@ -133,8 +145,16 @@ EOF;
         </script>
 
         <fieldset>
-            <textarea id="af_domains" name="af_domains" data-dojo-type="dijit/form/SimpleTextarea" style="height:400px;box-sizing:border-box;">{$enabledDomains}</textarea>
+            <textarea name="af_refspoof_domains" data-dojo-type="dijit/form/SimpleTextarea" style="height:400px;box-sizing:border-box;">{$enabledDomains}</textarea>
         </fieldset>
+
+        <hr>
+
+        <fieldset>
+            <label for="af_refspoof_enabled_globally" class="checkbox">{$enabledGloballyCheckbox} {$enabledGlobally}</label>
+        </fieldset>
+
+        <hr>
 
         <fieldset>
             {$submitTag}
@@ -146,9 +166,11 @@ EOT;
 
     public function hook_render_article_cdm($article)
     {
-        $enabledFeeds  = $this->host->get($this, static::ENABLED_FEEDS, array());
-
-        if (array_key_exists($article['feed_id'], $enabledFeeds) || $this->isDomainEnabled($article["site_url"])) {
+        if (
+            $this->host->get($this, static::ENABLED_GLOBALLY)
+            || array_key_exists($article['feed_id'], $this->host->get($this, static::ENABLED_FEEDS, array()))
+            || $this->isDomainEnabled($article["site_url"])
+        ) {
             $doc = new DOMDocument();
             @$doc->loadHTML($article['content']);
             if ($doc !== false) {
@@ -223,17 +245,22 @@ EOT;
 
     public function save_domains()
     {
-        if (!isset($_POST["af_domains"])) {
+        if (!isset($_POST["af_refspoof_domains"])) {
             echo __("No domains saved");
             return;
         }
-        $domains = explode("\n", str_replace("\r", "", $_POST["af_domains"]));
-        foreach ($domains as $key => $value) {
-            if (strlen($value) < 1) {
-                unset($domains[$key]);
+
+        $enabledDomains = explode("\n", str_replace("\r", "", $_POST["af_refspoof_domains"]));
+        foreach ($enabledDomains as $key => $value) {
+            if (strlen(trim($value)) === 0) {
+                unset($enabledDomains[$key]);
             }
         }
-        $this->host->set($this, static::ENABLED_DOMAINS, $domains);
+
+        $this->host->set_array($this, [
+            static::ENABLED_DOMAINS => $enabledDomains,
+            static::ENABLED_GLOBALLY => $_POST["af_refspoof_enabled_globally"] ?? "" === "on" ? true : false
+        ]);
         echo __("Domains saved");
     }
 
