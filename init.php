@@ -1,8 +1,10 @@
 <?php
 class af_refspoof extends Plugin
 {
-    private const STORAGE_ENABLED_FEEDS = 'feeds';
-    private const STORAGE_ENABLED_DOMAINS = "enabled_domains";
+    private const LEGACY_ENABLED_FEEDS = 'feeds'; // 2021-03-14
+    private const ENABLED_FEEDS = "enabled_feeds";
+    private const ENABLED_DOMAINS = "enabled_domains";
+    private const ENABLED_GLOBALLY = "enabled_globally";
 
     private $host;
 
@@ -38,17 +40,50 @@ class af_refspoof extends Plugin
         $this->host->add_hook($host::HOOK_PREFS_SAVE_FEED, $this);
         $this->host->add_hook($host::HOOK_PREFS_TAB, $this);
         $this->host->add_hook($host::HOOK_RENDER_ARTICLE_CDM, $this);
+
+        $legacyEnabledFeeds = $this->host->get($this, static::LEGACY_ENABLED_FEEDS, false);
+        if (is_array($legacyEnabledFeeds)) {
+            $enabledFeeds = $this->host->get($this, static::ENABLED_FEEDS, array());
+
+            foreach ($legacyEnabledFeeds as $key => $value) {
+                if (!array_key_exists($key, $enabledFeeds)) {
+                    $enabledFeeds[$key] = $value;
+                }
+            }
+
+            $this->host->set($this, static::LEGACY_ENABLED_FEEDS, null);
+            $this->host->set($this, static::ENABLED_FEEDS, $enabledFeeds);
+        }
     }
 
     public function hook_prefs_edit_feed($feedId)
     {
-        $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
-        $checked = array_key_exists($feedId, $enabledFeeds) ? " checked" : "";
+        $feed = ORM::for_table("ttrss_feeds")
+                ->where("id", $feedId)
+                ->where("owner_uid", $_SESSION["uid"])
+                ->find_one();
+
+        $enabledFeeds = $this->host->get($this, static::ENABLED_FEEDS, array());
+
+        $message = "";
+        if ($this->host->get($this, static::ENABLED_GLOBALLY, false)) {
+            $checked = " checked disabled";
+            $message = "<p>" . __("Fake referral is enabled globally.") . "</p>";
+        } elseif ($this->isDomainEnabled($feed["site_url"])) {
+            $checked = " checked disabled";
+            $message = "<p>" . __("This feed is enabled based on the domain list") . "</p>";
+        } elseif (array_key_exists($feedId, $enabledFeeds)) {
+            $checked = " checked";
+        } else {
+            $checked = "";
+        }
+
         $title = __("Fake referral");
         $label = __('Fake referral for this feed');
 
         echo <<<EOF
 <header>{$title}</header>
+{$message}
 <section>
     <fieldset>
         <input dojoType="dijit.form.CheckBox" type="checkbox" id="af_refspoof_enabled" name="af_refspoof_enabled"{$checked}>
@@ -62,7 +97,7 @@ EOF;
 
     public function hook_prefs_save_feed($feedId)
     {
-        $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
+        $enabledFeeds = $this->host->get($this, static::ENABLED_FEEDS, array());
 
         if (checkbox_to_sql_bool($_POST["af_refspoof_enabled"] ?? false)) {
             $enabledFeeds[$feedId] = $feedId;
@@ -70,7 +105,7 @@ EOF;
             unset($enabledFeeds[$feedId]);
         }
 
-        $this->host->set($this, static::STORAGE_ENABLED_FEEDS, $enabledFeeds);
+        $this->host->set($this, static::ENABLED_FEEDS, $enabledFeeds);
     }
 
     public function hook_prefs_tab($args)
@@ -81,7 +116,15 @@ EOF;
 
         $title = __("Fake referral");
         $heading = __("Enable referral spoofing based on the feed domain (enter one domain per line)");
-        $enabledDomains = implode("\n", $this->host->get($this, static::STORAGE_ENABLED_DOMAINS, array()));
+        $enabledDomains = htmlspecialchars(implode("\n", $this->host->get($this, static::ENABLED_DOMAINS, array())));
+        $enabledGloballyCheckbox = \Controls\checkbox_tag(
+            "af_refspoof_enabled_globally",
+            $this->host->get($this, static::ENABLED_GLOBALLY, false) === true ? true : false,
+            "on",
+            array(),
+            "af_refspoof_enabled_globally"
+        );
+        $enabledGlobally = __("Enabled globally");
         $pluginHandlerTags = \Controls\pluginhandler_tags($this, "save_domains");
         $submitTag = \Controls\submit_tag(__("Save"));
 
@@ -102,8 +145,16 @@ EOF;
         </script>
 
         <fieldset>
-            <textarea id="af_domains" name="af_domains" data-dojo-type="dijit/form/SimpleTextarea" style="height:400px;box-sizing:border-box;">{$enabledDomains}</textarea>
+            <textarea name="af_refspoof_domains" data-dojo-type="dijit/form/SimpleTextarea" style="height:400px;box-sizing:border-box;">{$enabledDomains}</textarea>
         </fieldset>
+
+        <hr>
+
+        <fieldset>
+            <label for="af_refspoof_enabled_globally" class="checkbox">{$enabledGloballyCheckbox} {$enabledGlobally}</label>
+        </fieldset>
+
+        <hr>
 
         <fieldset>
             {$submitTag}
@@ -115,9 +166,11 @@ EOT;
 
     public function hook_render_article_cdm($article)
     {
-        $enabledFeeds  = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
-
-        if (array_key_exists($article['feed_id'], $enabledFeeds) || $this->isDomainEnabled($article["site_url"])) {
+        if (
+            $this->host->get($this, static::ENABLED_GLOBALLY)
+            || array_key_exists($article['feed_id'], $this->host->get($this, static::ENABLED_FEEDS, array()))
+            || $this->isDomainEnabled($article["site_url"])
+        ) {
             $doc = new DOMDocument();
             @$doc->loadHTML($article['content']);
             if ($doc !== false) {
@@ -157,7 +210,6 @@ EOT;
         }
 
         $requestUri .= $_REQUEST["url"];
-        $filename = basename($requestUri);
         $userAgent = "Mozilla/5.0 (Windows NT 6.0; WOW64; rv:66.0) Gecko/20100101 Firefox/66.0";
 
         $curl = curl_init($requestUri);
@@ -169,7 +221,7 @@ EOT;
         $curlInfo = curl_getinfo($curl);
         curl_close($curl);
 
-        if ($_REQUEST["origin_info"] ?? false) {
+        if (($_REQUEST["origin_info"] ?? false) && $_SESSION["access_level"] >= 10) {
             header("Content-Type: text/plain");
             echo "Request url:                  " . $_REQUEST["url"] . "\n";
             echo "Request url after processing: " . $requestUri . "\n";
@@ -179,8 +231,8 @@ EOT;
             echo "\nCURL data:\n";
             echo $curlData;
 
-        } else if ($curlInfo["http_code"] ?? false === 200) {
-            if ($url["path"] ?? null !== null) {
+        } else if (($curlInfo["http_code"] ?? false) === 200) {
+            if (($url["path"] ?? null) !== null) {
                 header('Content-Disposition: inline; filename="' . basename($url["path"]) . '"');
             }
             header("Content-Type: " . $curlInfo["content_type"]);
@@ -193,23 +245,28 @@ EOT;
 
     public function save_domains()
     {
-        if (!isset($_POST["af_domains"])) {
+        if (!isset($_POST["af_refspoof_domains"])) {
             echo __("No domains saved");
             return;
         }
-        $domains = explode("\n", str_replace("\r", "", $_POST["af_domains"]));
-        foreach ($domains as $key => $value) {
-            if (strlen($value) < 1) {
-                unset($domains[$key]);
+
+        $enabledDomains = explode("\n", str_replace("\r", "", $_POST["af_refspoof_domains"]));
+        foreach ($enabledDomains as $key => $value) {
+            if (strlen(trim($value)) === 0) {
+                unset($enabledDomains[$key]);
             }
         }
-        $this->host->set($this, static::STORAGE_ENABLED_DOMAINS, $domains);
+
+        $this->host->set_array($this, [
+            static::ENABLED_DOMAINS => $enabledDomains,
+            static::ENABLED_GLOBALLY => $_POST["af_refspoof_enabled_globally"] ?? "" === "on" ? true : false
+        ]);
         echo __("Domains saved");
     }
 
     private function isDomainEnabled($feedUri)
     {
-        $enabledDomains = $this->host->get($this, static::STORAGE_ENABLED_DOMAINS, array());
+        $enabledDomains = $this->host->get($this, static::ENABLED_DOMAINS, array());
         $host = parse_url($feedUri, PHP_URL_HOST);
 
         if (strpos($host, "www.") === 0 && in_array(str_replace("www.", "", $host), $enabledDomains)) {
