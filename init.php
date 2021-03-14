@@ -172,8 +172,7 @@ EOT;
             || $this->isDomainEnabled($article["site_url"])
         ) {
             $doc = new DOMDocument();
-            @$doc->loadHTML($article['content']);
-            if ($doc !== false) {
+            if (!empty($article["content"]) && $doc->loadHTML($article["content"])) {
                 $xpath = new DOMXPath($doc);
                 $entries = $xpath->query("(//img[@src])");
                 $backendURL = Config::get_self_url() . '/backend.php?op=pluginhandler&method=proxy&plugin=af_refspoof';
