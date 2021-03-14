@@ -42,13 +42,29 @@ class af_refspoof extends Plugin
 
     public function hook_prefs_edit_feed($feedId)
     {
+        $feed = ORM::for_table("ttrss_feeds")
+                ->where("id", $feedId)
+                ->where("owner_uid", $_SESSION["uid"])
+                ->find_one();
+
         $enabledFeeds = $this->host->get($this, static::STORAGE_ENABLED_FEEDS, array());
-        $checked = array_key_exists($feedId, $enabledFeeds) ? " checked" : "";
+
+        $message = "";
+        if ($this->isDomainEnabled($feed["site_url"])) {
+            $checked = " checked disabled";
+            $message = "<p>" . __("This feed is enabled based on the domain list") . "</p>";
+        } elseif (array_key_exists($feedId, $enabledFeeds)) {
+            $checked = " checked";
+        } else {
+            $checked = "";
+        }
+
         $title = __("Fake referral");
         $label = __('Fake referral for this feed');
 
         echo <<<EOF
 <header>{$title}</header>
+{$message}
 <section>
     <fieldset>
         <input dojoType="dijit.form.CheckBox" type="checkbox" id="af_refspoof_enabled" name="af_refspoof_enabled"{$checked}>
