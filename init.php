@@ -125,7 +125,7 @@ EOF;
             "af_refspoof_enabled_globally"
         );
         $enabledGlobally = __("Enabled globally");
-        $pluginHandlerTags = \Controls\pluginhandler_tags($this, "save_domains");
+        $pluginHandlerTags = \Controls\pluginhandler_tags($this, "save_settings");
         $submitTag = \Controls\submit_tag(__("Save"));
 
         echo <<<EOT
@@ -242,14 +242,11 @@ EOT;
         }
     }
 
-    public function save_domains()
+    public function save_settings()
     {
-        if (!isset($_POST["af_refspoof_domains"])) {
-            echo __("No domains saved");
-            return;
-        }
+        $enabledDomains = str_replace("\r", "", $_POST["af_refspoof_domains"] ?? "");
+        $enabledDomains = explode("\n", $enabledDomains);
 
-        $enabledDomains = explode("\n", str_replace("\r", "", $_POST["af_refspoof_domains"]));
         foreach ($enabledDomains as $key => $value) {
             if (strlen(trim($value)) === 0) {
                 unset($enabledDomains[$key]);
@@ -257,10 +254,11 @@ EOT;
         }
 
         $this->host->set_array($this, [
-            static::ENABLED_DOMAINS => $enabledDomains,
-            static::ENABLED_GLOBALLY => $_POST["af_refspoof_enabled_globally"] ?? "" === "on" ? true : false
+            static::ENABLED_DOMAINS => $enabledDomains ?? [],
+            static::ENABLED_GLOBALLY => ($_POST["af_refspoof_enabled_globally"] ?? "") === "on" ? true : false
         ]);
-        echo __("Domains saved");
+
+        echo __("af_refspoof: Settings saved");
     }
 
     private function isDomainEnabled($feedUri)
