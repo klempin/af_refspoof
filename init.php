@@ -144,24 +144,50 @@ EOT;
 
     public function proxy()
     {
+        $url = parse_url($_REQUEST["url"]);
+        $ref = parse_url($_REQUEST["ref"]);
         $requestUri = "";
+
         if (strpos($_REQUEST["url"], "/") === 0) {
-            $requestUri .= parse_url($_REQUEST["ref"], PHP_URL_SCHEME) . ":";
+            $requestUri .= ($ref["scheme"] ?? "http") . ":";
+
             if (strpos($_REQUEST["url"], "//") !== 0) {
                 $requestUri .= "/";
             }
         }
+
         $requestUri .= $_REQUEST["url"];
         $userAgent = "Mozilla/5.0 (Windows NT 6.0; WOW64; rv:66.0) Gecko/20100101 Firefox/66.0";
+
         $curl = curl_init($requestUri);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($curl, CURLOPT_MAXREDIRS, 10);
         curl_setopt($curl, CURLOPT_REFERER, $_REQUEST["ref"]);
         curl_setopt($curl, CURLOPT_USERAGENT, $userAgent);
-        $data = curl_exec($curl);
-        header("Content-Type: ". curl_getinfo($curl, CURLINFO_CONTENT_TYPE));
-        echo $data;
+        $curlData = curl_exec($curl);
+        $curlInfo = curl_getinfo($curl);
+        curl_close($curl);
+
+        if ($_REQUEST["origin_info"] ?? false) {
+            header("Content-Type: text/plain");
+            echo "Request url:                  " . $_REQUEST["url"] . "\n";
+            echo "Request url after processing: " . $requestUri . "\n";
+            echo "Referrer url:                 " . $_REQUEST["ref"] . "\n\n";
+            echo "CURL information:\n";
+            print_r($curlInfo);
+            echo "\nCURL data:\n";
+            echo $curlData;
+
+        } else if ($curlInfo["http_code"] ?? false === 200) {
+            if ($url["path"] ?? null !== null) {
+                header('Content-Disposition: inline; filename="' . basename($url["path"]) . '"');
+            }
+            header("Content-Type: " . $curlInfo["content_type"]);
+            echo $curlData;
+
+        } {
+            http_response_code($curlInfo["http_code"]);
+        }
     }
 
     public function save_domains()
