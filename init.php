@@ -221,7 +221,7 @@ EOT;
         $curlInfo = curl_getinfo($curl);
         curl_close($curl);
 
-        if ($_REQUEST["origin_info"] ?? false) {
+        if (($_REQUEST["origin_info"] ?? false) && $_SESSION["access_level"] >= 10) {
             header("Content-Type: text/plain");
             echo "Request url:                  " . $_REQUEST["url"] . "\n";
             echo "Request url after processing: " . $requestUri . "\n";
@@ -231,8 +231,8 @@ EOT;
             echo "\nCURL data:\n";
             echo $curlData;
 
-        } else if ($curlInfo["http_code"] ?? false === 200) {
-            if ($url["path"] ?? null !== null) {
+        } else if (($curlInfo["http_code"] ?? false) === 200) {
+            if (($url["path"] ?? null) !== null) {
                 header('Content-Disposition: inline; filename="' . basename($url["path"]) . '"');
             }
             header("Content-Type: " . $curlInfo["content_type"]);
