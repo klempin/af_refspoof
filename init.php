@@ -277,7 +277,7 @@ EOT;
             }
             header("Content-Type: " . $curlInfo["content_type"]);
             echo $curlData;
-        } {
+        } else {
             http_response_code($curlInfo["http_code"]);
         }
     }
